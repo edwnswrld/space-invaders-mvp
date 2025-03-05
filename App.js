@@ -5,7 +5,7 @@ import { AppRegistry } from 'react-native';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
-const PLAYER_SIZE = 30; // Triangle base width and height
+const PLAYER_SIZE = 30;
 const ALIEN_WIDTH = 30;
 const ALIEN_HEIGHT = 20;
 const BULLET_WIDTH = 5;
@@ -14,14 +14,15 @@ const ALIEN_ROWS = 2;
 const ALIEN_COLS = 5;
 const ALIEN_SPEED = 2;
 const BULLET_SPEED = 5;
-const EXPLOSION_DURATION = 500; // milliseconds
+const EXPLOSION_DURATION = 500;
 
 const SpaceInvaders = () => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [entities, setEntities] = useState(null);
+  const [gameStarted, setGameStarted] = useState(false);
 
-  useEffect(() => {
+  const initializeGame = () => {
     const player = {
       position: [WINDOW_WIDTH / 2 - PLAYER_SIZE / 2, WINDOW_HEIGHT - 50],
       size: [PLAYER_SIZE, PLAYER_SIZE],
@@ -35,7 +36,7 @@ const SpaceInvaders = () => {
           position: [col * (ALIEN_WIDTH + 10) + 50, row * (ALIEN_HEIGHT + 10) + 50],
           size: [ALIEN_WIDTH, ALIEN_HEIGHT],
           renderer: Alien,
-          direction: 1, // 1 for right, -1 for left
+          direction: 1,
         });
       }
     }
@@ -44,14 +45,22 @@ const SpaceInvaders = () => {
       1: player,
       ...aliens.reduce((acc, alien, idx) => ({ ...acc, [idx + 2]: alien }), {}),
     });
-  }, []);
+    setScore(0);
+    setGameOver(false);
+  };
+
+  useEffect(() => {
+    if (gameStarted && !entities) {
+      initializeGame();
+    }
+  }, [gameStarted]);
 
   const Systems = {
     MovePlayer: (entities, { touches }) => {
       if (!entities[1]) return entities;
       const player = entities[1];
       touches.filter(t => t.type === 'move').forEach(t => {
-        const newX = t.event.pageX - PLAYER_SIZE / 2; // Center on finger
+        const newX = t.event.pageX - PLAYER_SIZE / 2;
         player.position[0] = Math.max(0, Math.min(WINDOW_WIDTH - PLAYER_SIZE, newX));
       });
       return entities;
@@ -71,8 +80,8 @@ const SpaceInvaders = () => {
         for (let id in entities) {
           if (id !== '1' && entities[id]?.renderer === Alien) {
             const alien = entities[id];
-            alien.position[1] += 10; // Drop down
-            alien.direction *= -1; // Reverse direction
+            alien.position[1] += 10;
+            alien.direction *= -1;
           }
         }
       }
@@ -120,7 +129,6 @@ const SpaceInvaders = () => {
                 bullet.position[1] < alien.position[1] + ALIEN_HEIGHT &&
                 bullet.position[1] + BULLET_HEIGHT > alien.position[1]
               ) {
-                // Replace alien with explosion
                 const explosionId = alienId;
                 entities[explosionId] = {
                   position: [alien.position[0], alien.position[1]],
@@ -135,14 +143,13 @@ const SpaceInvaders = () => {
           }
         }
       }
-      // Remove expired explosions
       for (let id in entities) {
         if (entities[id]?.renderer === Explosion && Date.now() > entities[id].timeout) {
           delete entities[id];
         }
       }
       if (Object.keys(entities).filter(id => entities[id]?.renderer === Alien).length === 0 && entities[1]) {
-        setGameOver(true); // Win condition
+        setGameOver(true);
       }
       return entities;
     },
@@ -180,11 +187,22 @@ const SpaceInvaders = () => {
     </View>
   );
 
-  if (gameOver) {
+  if (!gameStarted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Space Invaders</Text>
+        <TouchableOpacity onPress={() => setGameStarted(true)}>
+          <Text style={styles.startButton}>Start</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (gameOver && entities) {
     return (
       <View style={styles.container}>
         <Text style={styles.gameOver}>Game Over! Score: {score}</Text>
-        <TouchableOpacity onPress={() => { setGameOver(false); setScore(0); setEntities(null); }}>
+        <TouchableOpacity onPress={() => initializeGame()}>
           <Text style={styles.restart}>Restart</Text>
         </TouchableOpacity>
       </View>
@@ -212,13 +230,15 @@ const SpaceInvaders = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
+  container: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },
   gameContainer: { flex: 1 },
   entity: { position: 'absolute' },
   score: { color: 'white', fontSize: 20, textAlign: 'center', marginTop: 20 },
   gameOver: { color: 'white', fontSize: 30, textAlign: 'center', marginTop: WINDOW_HEIGHT / 2 - 50 },
   restart: { color: 'white', fontSize: 20, textAlign: 'center', marginTop: 20 },
-  loading: { color: 'white', fontSize: 20, textAlign: 'center', marginTop: WINDOW_HEIGHT / 2 },
+  loading: { color: 'white', fontSize: 20, textAlign: 'center' },
+  title: { color: 'white', fontSize: 40, fontWeight: 'bold', textAlign: 'center', marginBottom: 40 },
+  startButton: { color: 'white', fontSize: 30, textAlign: 'center', backgroundColor: 'green', padding: 10, borderRadius: 5 },
 });
 
 AppRegistry.registerComponent('main', () => SpaceInvaders);
